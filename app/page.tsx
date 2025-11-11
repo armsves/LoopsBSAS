@@ -1,23 +1,10 @@
 "use client";
-import { StorageManager } from "@/components/StorageManager";
-import { useAccount } from "wagmi";
-import { useEffect, useState } from "react";
-import { FileUploader } from "@/components/FileUploader";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import Confetti from "@/components/ui/Confetti";
 import { useConfetti } from "@/hooks/useConfetti";
-import { DatasetsViewer } from "@/components/DatasetsViewer";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useBalances } from "@/hooks/useBalances";
 import Github from "@/components/ui/icons/Github";
-import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
-import { calibration } from '@filoz/synapse-core/chains';
-import { StorageContent } from "@/components/StorageContent";
 import { GitHubRepoView } from "@/components/ui/GitHubRepoView";
 import { MonitoringGraph } from "@/components/ui/MonitoringGraph";
-/** Valid tab identifiers for application navigation */
-type Tab = "manage-storage" | "upload" | "datasets";
 
 // Animation variants for smooth tab transitions using Framer Motion
 const containerVariants = {
@@ -43,69 +30,11 @@ const itemVariants = {
 };
 
 /**
- * Root page component orchestrating the main application UI.
- * Manages tab-based navigation, data fetching, and distribution to child components.
- * Synchronizes active tab with URL parameters for shareable links.
- *
- * @example
- * URL patterns:
- * - /?tab=manage-storage - Storage management dashboard
- * - /?tab=upload - File upload interface
- * - /?tab=datasets - Dataset viewer
+ * Root page component - Web3 services database homepage
+ * Shows information about the open source DB for Web3 services
  */
 export default function Home() {
-  const { isConnected, address, chainId } = useAccount();
-  const [activeTab, setActiveTab] = useState<Tab>("manage-storage");
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const { showConfetti } = useConfetti();
-
-  // Check if we're on the correct chain for synapse operations
-  const isOnCalibration = chainId === calibration.id;
-
-  // Fetch data at top level and distribute via props for centralized loading state
-  const { data: balances, isLoading: isLoadingBalances } = useBalances();
-
-  /** Type guard to validate tab parameter from URL */
-  const isTab = (value: string | null): value is Tab =>
-    value === "manage-storage" || value === "upload" || value === "datasets";
-
-  /** Updates URL query parameter to reflect active tab (enables shareable links) */
-  const updateUrl = (tab: Tab) => {
-    const params = new URLSearchParams(searchParams?.toString());
-    params.set("tab", tab);
-    router.replace(`?${params.toString()}`);
-  };
-
-  /** Handles tab switching with URL synchronization */
-  const handleTabChange = (tab: Tab) => {
-    setActiveTab(tab);
-    updateUrl(tab);
-  };
-
-  // Bidirectional sync: URL param ↔ local state
-  // URL is source of truth on mount, state updates URL on change
-  useEffect(() => {
-    const tabParam = searchParams?.get("tab");
-    if (isTab(tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam);
-    } else if (!tabParam) {
-      updateUrl(activeTab);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // Listen for tab change events from StorageContent
-  useEffect(() => {
-    const onTabChange = (e: any) => {
-      if (isTab(e.detail)) {
-        setActiveTab(e.detail);
-        updateUrl(e.detail);
-      }
-    };
-    window.addEventListener('changeTab', onTabChange);
-    return () => window.removeEventListener('changeTab', onTabChange);
-  }, []);
 
   return (
     <div className="w-full flex flex-col min-h-fit" style={{ backgroundColor: "var(--background)" }}>
@@ -199,24 +128,6 @@ export default function Home() {
           </motion.div>
         </div>
 
-        {/* Original Content - Hidden by default, shown when connected */}
-        <AnimatePresence mode="wait">
-          {isConnected && isOnCalibration && (
-            <motion.div
-              key="storage-content"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="mt-8"
-            >
-              <StorageContent
-                activeTab={activeTab}
-                balances={balances}
-                isBalanceLoading={isLoadingBalances}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.main>
     </div>
   );

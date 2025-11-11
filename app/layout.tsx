@@ -14,7 +14,6 @@ import { Navbar } from "@/components/ui/Navbar";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { ConfettiProvider } from "@/providers/ConfettiProvider";
 import { ConfigProvider } from "@/providers/ConfigProvider";
-import Footer from "@/components/ui/Footer";
 import { GeolocationProvider } from "@/providers/GeolocationProvider";
 import { config } from "@/services/wagmi";
 import { calibration } from '@filoz/synapse-core/chains';

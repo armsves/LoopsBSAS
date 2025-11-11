@@ -1,18 +1,18 @@
 "use client";
 
-import { StorageManager } from "@/components/StorageManager";
 import { FileUploader } from "@/components/FileUploader";
 import { DatasetsViewer } from "@/components/DatasetsViewer";
+import { StorageManager } from "@/components/StorageManager";
 import { motion, AnimatePresence } from "framer-motion";
-import { useDataSets } from "@filoz/synapse-react";
-import { useAccount } from "wagmi";
+import { useDataSetsWrapped } from "@/hooks/useDataSetsWrapped";
+import { UseBalancesResponse } from "@/types";
 
 type Tab = "manage-storage" | "upload" | "datasets";
 
 interface StorageContentProps {
   activeTab: Tab;
-  balances: any;
-  isBalanceLoading: boolean;
+  balances?: UseBalancesResponse;
+  isBalanceLoading?: boolean;
 }
 
 /**
@@ -20,15 +20,11 @@ interface StorageContentProps {
  * This prevents synapse hooks from running on incompatible chains
  */
 export function StorageContent({ activeTab, balances, isBalanceLoading }: StorageContentProps) {
-  const { address } = useAccount();
-
   const {
     data: datasetsData,
     isLoading,
     isFetchedAfterMount,
-  } = useDataSets({
-    address,
-  });
+  } = useDataSetsWrapped();
 
   const isLoadingDatasets = isLoading || !isFetchedAfterMount;
 
@@ -89,7 +85,7 @@ export function StorageContent({ activeTab, balances, isBalanceLoading }: Storag
 
       <AnimatePresence mode="wait">
         <motion.div
-          key="deposit"
+          key="manage-storage"
           className={`${
             activeTab === "manage-storage" ? "opacity-100" : "hidden"
           }`}
@@ -102,11 +98,13 @@ export function StorageContent({ activeTab, balances, isBalanceLoading }: Storag
             damping: 20,
           }}
         >
-          <StorageManager
-            balances={balances}
-            datasetsData={datasetsData ?? []}
-            isBalanceLoading={isBalanceLoading}
-          />
+          {balances && (
+            <StorageManager
+              balances={balances}
+              datasetsData={datasetsData ?? []}
+              isBalanceLoading={isBalanceLoading ?? false}
+            />
+          )}
         </motion.div>
         <motion.div
           key="upload"
