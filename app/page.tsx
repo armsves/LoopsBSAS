@@ -14,6 +14,8 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { calibration } from '@filoz/synapse-core/chains';
 import { StorageContent } from "@/components/StorageContent";
+import { GitHubRepoView } from "@/components/ui/GitHubRepoView";
+import { MonitoringGraph } from "@/components/ui/MonitoringGraph";
 /** Valid tab identifiers for application navigation */
 type Tab = "manage-storage" | "upload" | "datasets";
 
@@ -106,7 +108,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="w-full flex flex-col justify-center min-h-fit">
+    <div className="w-full flex flex-col min-h-fit" style={{ backgroundColor: "var(--background)" }}>
       {showConfetti && (
         <Confetti
           recycle={false}
@@ -125,118 +127,94 @@ export default function Home() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="flex flex-col items-center my-10  w-full mx-auto"
+        className="w-full mx-auto px-6 py-8 max-w-7xl"
       >
-        <motion.div
-          variants={itemVariants}
-          whileHover={{ scale: 1.05 }}
-          transition={{ duration: 0.3 }}
-          className="sm:text-3xl text-xl font-bold uppercase tracking-tighter text-foreground flex flex-col sm:flex-row items-center gap-2"
-        >
-          <div className="flex items-center gap-2">
-            <Image src="/filecoin.svg" alt="Filecoin" width={30} height={30} />
-            <span>Filecoin onchain cloud</span>
-          </div>
-          <motion.p
+        {/* Top Section - Two Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          {/* Top Left - Description Panel */}
+          <motion.div
             variants={itemVariants}
-            className="text-lg font-medium lowercase transition-colors duration-50 hover:text-foreground flex flex-row items-center gap-2 text-secondary"
+            className="rounded-xl p-8"
+            style={{
+              backgroundColor: "#1F1F23",
+              border: "1px solid var(--border)",
+            }}
           >
+            <h2 className="text-2xl font-bold mb-4">
+              The open source DB for Web3 services
+            </h2>
+            <p className="text-base mb-6" style={{ color: "var(--secondary)", lineHeight: "1.6" }}>
+              A community-driven database of Web3 services - including RPCs, wallets, explorers, bridges, oracles, dev tools and more. Explore, compare and contribute to help other developers stop wasting time on searching for the right service.
+            </p>
             <motion.a
-              whileHover={{ scale: 1.3 }}
               href="https://github.com/FIL-Builders/fs-upload-dapp"
-              className="text-primary transition-colors duration-200 hover:underline cursor-pointer rounded-md hover:text-[#008cf6]"
               target="_blank"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <Github />
-            </motion.a>
-            <span>powered by</span>
-            <motion.a
-              href="https://github.com/FilOzone/synapse-sdk"
-              className="text-primary transition-colors duration-200 hover:underline cursor-pointer hover:text-[#008cf6] rounded-md p-1"
-              target="_blank"
-            >
-              synapse-sdk
-            </motion.a>
-          </motion.p>
-        </motion.div>
-
-        <motion.p
-          variants={itemVariants}
-          className="text-base font-medium capitalize-none transition-colors duration-50 mb-2 mt-1 hover:text-foreground flex flex-col sm:flex-row items-center gap-2 text-center text-secondary"
-        >
-          <span>
-            upload files to filecoin with{" "}
-            <motion.a
-              href="https://docs.secured.finance/usdfc-stablecoin/getting-started"
-              className="text-[#e9ac00] hover:underline cursor-pointer"
-              target="_blank"
-            >
-              USDFC
-            </motion.a>
-          </span>
-
-          <span className="hidden sm:inline">your balance is</span>
-          <span className="font-bold hidden sm:inline">
-            {isLoadingBalances || !isConnected
-              ? "..."
-              : balances?.usdfcBalanceFormatted.toFixed(1) + "$"}
-          </span>
-        </motion.p>
-        <AnimatePresence mode="wait">
-          {!isConnected ? (
-            <motion.div
-              key="connect"
-              variants={itemVariants}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{
-                type: "spring",
-                stiffness: 200,
-                damping: 20,
-              }}
-              className="flex flex-col items-center"
-            >
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+              <button
+                className="px-6 py-3 rounded-lg font-medium text-white flex items-center gap-2 transition-all"
+                style={{
+                  backgroundColor: "#FF6A00",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#FF7A10";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#FF6A00";
+                }}
               >
-                <ConnectButton />
-              </motion.div>
-              <motion.p variants={itemVariants} className="mt-3 text-secondary">
-                <span className="hidden sm:inline">
-                  Please connect your wallet to upload dApp
-                </span>
-                <span className="sm:hidden">Connect wallet to continue</span>
-              </motion.p>
-            </motion.div>
-          ) : !isOnCalibration ? (
+                <Github />
+                Explore on GitHub
+              </button>
+            </motion.a>
+          </motion.div>
+
+          {/* Top Right - GitHub Repository View */}
+          <GitHubRepoView />
+        </div>
+
+        {/* Bottom Section - Two Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Bottom Left - Monitoring Graph */}
+          <MonitoringGraph />
+
+          {/* Bottom Right - Load Balancing Panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="rounded-xl p-6"
+            style={{
+              backgroundColor: "#1F1F23",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <h3 className="text-lg font-bold mb-4">
+              Automated load balancing with performance monitoring
+            </h3>
+            <p className="text-sm" style={{ color: "var(--secondary)", lineHeight: "1.6" }}>
+              Ensure your app stays fast and reliable with automated load balancing across multiple RPC providers. Monitor latency and performance metrics in real-time to optimize your Web3 infrastructure.
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Original Content - Hidden by default, shown when connected */}
+        <AnimatePresence mode="wait">
+          {isConnected && isOnCalibration && (
             <motion.div
-              key="wrong-network"
-              variants={itemVariants}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="flex flex-col items-center max-w-2xl"
+              key="storage-content"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="mt-8"
             >
-              <div className="p-6 bg-yellow-500/10 border border-yellow-500 rounded-lg text-center">
-                <h3 className="text-xl font-bold text-yellow-500 mb-2">
-                  Wrong Network
-                </h3>
-                <p className="text-yellow-500 mb-4">
-                  Storage features require Filecoin Calibration network. Please switch your network using the wallet button above.
-                </p>
-                <p className="text-sm text-secondary">
-                  For cross-chain swaps, visit the <a href="/swap" className="text-primary hover:underline">OnlySwap page</a>.
-                </p>
-              </div>
+              <StorageContent
+                activeTab={activeTab}
+                balances={balances}
+                isBalanceLoading={isLoadingBalances}
+              />
             </motion.div>
-          ) : (
-            <StorageContent
-              activeTab={activeTab}
-              balances={balances}
-              isBalanceLoading={isLoadingBalances}
-            />
           )}
         </AnimatePresence>
       </motion.main>

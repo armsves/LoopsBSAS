@@ -46,22 +46,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <head>
-        <title>Filecoin onchain cloud demo</title>
+        <title>CHAIN.LOVE - The open source DB for Web3 services</title>
         <meta
           name="description"
-          content="Demo dApp Powered by synapse-sdk. Upload files to Filecoin with USDFC."
+          content="A community-driven database of Web3 services - including RPCs, wallets, explorers, bridges, oracles, dev tools and more."
         />
         <meta
           name="keywords"
-          content="Filecoin, Demo, synapse-sdk, pdp, upload, filecoin, usdfc"
+          content="Web3, blockchain, RPC, wallets, explorers, bridges, oracles, dev tools"
         />
         <meta name="author" content="FIL-Builders" />
-        <meta name="viewport" content="width=device-width, initial-scale=0.6" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <link rel="icon" href="/filecoin.svg" />
       </head>
-      <body>
+      <body className="dark">
         <GeolocationProvider
           onBlocked={(info: any) => {
             console.log("blocked", info);
@@ -86,7 +86,6 @@ export default function RootLayout({
                         <Navbar />
                         {children}
                       </main>
-                      <Footer />
                     </RainbowKitProvider>
                   </WagmiProvider>
                 </QueryClientProvider>

@@ -5,23 +5,21 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ThemeToggle } from "./ThemeToggle";
 import { SettingsModal } from "./SettingsModal";
 import { motion } from "framer-motion";
-import Image from "next/image";
-import { SettingsIcon, ArrowLeftRight, PlusCircle } from "lucide-react";
+import { Heart, Github, ChevronUp, ChevronDown, X, ArrowRight, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAccount } from "wagmi";
+import GithubIcon from "./icons/Github";
 
 export function Navbar() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const pathname = usePathname();
-  const { chain } = useAccount();
 
   return (
     <motion.nav
       initial={{ y: -100 }}
       animate={{ y: 0 }}
       transition={{ type: "spring", stiffness: 100, damping: 20 }}
-      className="flex items-center justify-between px-3 py-3 border-b relative"
+      className="flex items-center justify-between px-6 py-4 border-b relative"
       style={{
         borderColor: "var(--border)",
         backgroundColor: "var(--background)"
@@ -31,77 +29,76 @@ export function Navbar() {
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2 }}
-        className="flex items-center justify-start gap-2 sm:gap-4 min-w-0 flex-1 z-10"
+        className="flex items-center gap-2 z-10"
       >
         <Link href="/">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="flex items-center gap-1 ml-4 sm:ml-0 cursor-pointer"
+            className="flex items-center gap-2 cursor-pointer"
           >
-            <Image
-              src="/filecoin.svg"
-              alt="Filecoin"
-              width={24}
-              height={24}
-              className="w-[30px] h-[30px]  flex-shrink-0"
-            />
-            <h1 className="text-sm sm:text-xl font-bold truncate flex-col items-center text-left lg:flex hidden">
-              Filecoin Onchain Cloud dApp
+            <Heart className="w-5 h-5" style={{ color: "#22c55e", fill: "#22c55e" }} />
+            <h1 className="text-lg font-bold">
+              CHAIN.LOVE
             </h1>
           </motion.div>
         </Link>
-
-        {/* Navigation Links */}
-        <div className="hidden md:flex items-center gap-2 ml-4">
-          <Link href="/">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-lg transition-all text-sm cursor-pointer inline-block font-semibold ${
-                pathname === "/"
-                  ? "bg-primary text-primary-foreground shadow-lg"
-                  : "hover:bg-muted text-foreground"
-              }`}
-            >
-              Storage
-            </motion.div>
-          </Link>
-          <Link href="/swap">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
-                pathname === "/swap"
-                  ? "bg-primary text-primary-foreground shadow-lg"
-                  : "hover:bg-muted text-foreground"
-              }`}
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-              OnlySwap
-            </motion.div>
-          </Link>
-          <Link href="/contribute">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
-                pathname === "/contribute"
-                  ? "bg-primary text-primary-foreground shadow-lg"
-                  : "hover:bg-muted text-foreground"
-              }`}
-            >
-              <PlusCircle className="w-4 h-4" />
-              Contribute
-            </motion.div>
-          </Link>
-        </div>
       </motion.div>
+      
       <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.3 }}
-        className="flex items-center gap-2 flex-shrink-0 justify-end z-10"
+        className="flex items-center gap-4 flex-shrink-0 z-10"
       >
+        <Link href="https://github.com/FIL-Builders/fs-upload-dapp" target="_blank">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="text-sm cursor-pointer hover:opacity-70 transition-opacity"
+          >
+            github
+          </motion.div>
+        </Link>
+        
+        <div className="flex items-center gap-1 text-sm">
+          <span>1/2</span>
+          <div className="flex flex-col">
+            <ChevronUp className="w-3 h-3" />
+            <ChevronDown className="w-3 h-3 -mt-1" />
+          </div>
+        </div>
+        
+        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
+          <X className="w-4 h-4 cursor-pointer hover:opacity-70 transition-opacity" />
+        </motion.div>
+        
+        <Link href="/contribute">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            className="text-sm cursor-pointer hover:opacity-70 transition-opacity"
+          >
+            itepaper
+          </motion.div>
+        </Link>
+        
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+          <Link href="/">
+            <button
+              className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all"
+              style={{
+                backgroundColor: "#FF6A00",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#FF7A10";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "#FF6A00";
+              }}
+            >
+              Get started
+            </button>
+          </Link>
+        </motion.div>
+        
         <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -121,17 +118,12 @@ export function Navbar() {
             <SettingsIcon className="w-5 h-5" />
           </button>
         </motion.div>
-        <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }}>
-          <ThemeToggle />
-        </motion.div>
-        <motion.div
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="flex items-center"
-        >
+        
+        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <ConnectButton showBalance={false} chainStatus="icon" />
         </motion.div>
       </motion.div>
+      
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
