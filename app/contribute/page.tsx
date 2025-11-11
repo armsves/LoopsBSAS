@@ -5,13 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, Send, AlertCircle, Plus } from "lucide-react";
 import Confetti from "@/components/ui/Confetti";
 import { useConfetti } from "@/hooks/useConfetti";
-import { useAccount } from "wagmi";
+import { useAccount, useSwitchChain } from "wagmi";
 import { useContributions } from "@/hooks/useContributions";
 import { useDataSetsWrapped } from "@/hooks/useDataSetsWrapped";
 import { Select } from "@/components/ui/Select";
-import { useFileUpload } from "@/hooks/useFileUpload";
-import { Button } from "@/components/ui/Button";
+import { useUploadJson } from "@/hooks/useUploadJson";
 import { useRouter } from "next/navigation";
+import { calibration } from '@filoz/synapse-core/chains';
 
 // Animation variants
 const containerVariants = {
@@ -49,12 +49,14 @@ interface FormErrors {
 }
 
 export default function ContributePage() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
+  const { switchChain } = useSwitchChain();
   const router = useRouter();
   const { addContribution } = useContributions();
   const { data: datasetsData, isLoading: isLoadingDatasets } = useDataSetsWrapped();
-  const { uploadFileMutation, uploadedInfo, handleReset, status, progress } = useFileUpload();
-  const { mutateAsync: uploadFile } = uploadFileMutation;
+  const { uploadJsonMutation, uploadedInfo, handleReset, status, progress } = useUploadJson();
+  const { mutateAsync: uploadJson } = uploadJsonMutation;
+  const isOnCalibration = chainId === calibration.id;
 
   const [formData, setFormData] = useState<FormData>({
     title: "",
@@ -64,9 +66,7 @@ export default function ContributePage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>("");
-  const [isDragging, setIsDragging] = useState(false);
   const { triggerConfetti, showConfetti } = useConfetti();
 
   const categories = [
@@ -113,32 +113,15 @@ export default function ContributePage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDragIn = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragOut = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      setFile(files[0]);
+  const handleSwitchChain = async () => {
+    try {
+      if (switchChain) {
+        await switchChain({ chainId: calibration.id });
+      }
+    } catch (error) {
+      console.error("Error switching chain:", error);
     }
-  }, []);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,37 +135,52 @@ export default function ContributePage() {
       return;
     }
 
+    if (!isOnCalibration) {
+      alert("Please switch to Filecoin Calibration network");
+      if (switchChain) {
+        await switchChain({ chainId: calibration.id });
+      }
+      return;
+    }
+
+    if (!selectedDatasetId) {
+      alert("Please select a dataset to store your contribution");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      let fileCid: string | undefined;
-      let fileTxHash: string | undefined;
+      // Upload form data as JSON to Filecoin storage
+      // The status and progress are managed by the uploadJsonMutation hook
+      const uploadResult = await uploadJson({
+        data: {
+          title: formData.title,
+          websiteUrl: formData.websiteUrl,
+          category: formData.category,
+          contributor: address,
+          timestamp: new Date().toISOString(),
+        },
+        datasetId: selectedDatasetId,
+        fileName: `contribution-${formData.title.replace(/\s+/g, '-').toLowerCase()}.json`,
+      });
 
-      // Upload file if provided (must happen before creating contribution)
-      if (file && selectedDatasetId) {
-        try {
-          await uploadFile({
-            file,
-            datasetId: selectedDatasetId,
-          });
-          // Get uploaded info after upload completes
-          fileCid = uploadedInfo?.pieceCid;
-          fileTxHash = uploadedInfo?.txHash;
-        } catch (uploadError) {
-          console.error("File upload failed:", uploadError);
-          // Continue with contribution creation even if file upload fails
-        }
-      }
+      // Get uploaded info after upload completes
+      // Note: uploadedInfo might not be updated immediately, so we wait a bit
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const pieceCid = uploadedInfo?.pieceCid;
+      const txHash = uploadedInfo?.txHash;
+      const fileSize = uploadedInfo?.fileSize;
 
       // Create contribution (PR entry) - represents a GitHub PR waiting for AI processing
-      const contribution = addContribution({
+      const contribution = await addContribution({
         contributor: address,
         data: {
           ...formData,
-          fileCid,
-          fileTxHash,
-          fileName: file?.name,
-          fileSize: file?.size,
+          pieceCid,
+          txHash,
+          fileSize,
+          fileName: `contribution-${formData.title.replace(/\s+/g, '-').toLowerCase()}.json`,
           datasetId: selectedDatasetId,
         },
         status: "pending", // Waiting for AI processing (like a PR waiting for review)
@@ -195,7 +193,6 @@ export default function ContributePage() {
       // Reset form after success
       setTimeout(() => {
         setFormData({ title: "", websiteUrl: "", category: "" });
-        setFile(null);
         setSelectedDatasetId("");
         setIsSuccess(false);
         handleReset();
@@ -402,127 +399,117 @@ export default function ContributePage() {
                   )}
                 </div>
 
-                {/* File Upload Section - Only show if connected */}
+                {/* Dataset Selection - Required for storing contribution data */}
                 {isConnected && (
-                  <>
-                    <div className="border-t pt-6 mt-6" style={{ borderColor: "var(--border)" }}>
-                      <h3 className="text-lg font-semibold mb-4">Upload Supporting File (Optional)</h3>
-                      
-                      {/* Dataset Selection */}
-                      {isLoadingDatasets ? (
-                        <div className="p-4 rounded-lg border text-center mb-4" style={{ backgroundColor: "var(--muted)", borderColor: "var(--border)" }}>
-                          Loading datasets...
-                        </div>
-                      ) : datasetsData && datasetsData.length > 0 ? (
-                        <div className="mb-4">
-                          <Select
-                            label="Select Dataset"
-                            value={selectedDatasetId}
-                            onChange={setSelectedDatasetId}
-                            disabled={isSubmitting || uploadFileMutation.isPending}
-                            placeholder="Select a dataset to upload to"
-                            helperText="Choose which dataset to store your file in"
-                            options={datasetsData.map((dataset) => ({
-                              value: dataset.dataSetId.toString(),
-                              label: `Dataset #${dataset.dataSetId} ${dataset.cdn ? "⚡" : ""}`,
-                            }))}
-                          />
-                        </div>
-                      ) : (
-                        <div className="p-4 rounded-lg border text-center mb-4" style={{ backgroundColor: "var(--muted)", borderColor: "var(--border)" }}>
-                          <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
-                            No datasets found. Go to Storage page to create a dataset first.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* File Drop Zone */}
-                      <div
-                        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                          isDragging
-                            ? "border-blue-500 bg-blue-500/10"
-                            : "border-gray-300 hover:border-gray-400"
-                        } ${
-                          isSubmitting || uploadFileMutation.isPending || !selectedDatasetId
-                            ? "cursor-not-allowed opacity-50"
-                            : "cursor-pointer"
-                        }`}
-                        onDragEnter={handleDragIn}
-                        onDragLeave={handleDragOut}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={() => {
-                          if (isSubmitting || uploadFileMutation.isPending || !selectedDatasetId) return;
-                          document.getElementById("contributeFileInput")?.click();
-                        }}
-                      >
-                        <input
-                          id="contributeFileInput"
-                          type="file"
-                          onChange={(e) => {
-                            e.target.files && setFile(e.target.files[0]);
-                            e.target.value = "";
-                          }}
-                          className="hidden"
-                          disabled={isSubmitting || uploadFileMutation.isPending || !selectedDatasetId}
-                        />
-                        <div className="flex flex-col items-center gap-2">
-                          <svg
-                            className={`w-10 h-10 ${
-                              isDragging ? "text-blue-500" : "text-gray-400"
-                            }`}
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                  <div className="border-t pt-6 mt-6" style={{ borderColor: "var(--border)" }}>
+                    <h3 className="text-lg font-semibold mb-4">Storage Configuration</h3>
+                    
+                    {/* Chain Validation */}
+                    {!isOnCalibration ? (
+                      <div className="p-4 rounded-lg border mb-4" style={{ backgroundColor: "var(--muted)", borderColor: "var(--border)" }}>
+                        <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
+                          Please switch to Filecoin Calibration network to store your contribution.
+                        </p>
+                        {switchChain && (
+                          <motion.button
+                            onClick={handleSwitchChain}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="px-4 py-2 rounded-lg font-medium text-white text-sm transition-all"
+                            style={{
+                              backgroundColor: "#FF6A00",
+                            }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                            />
-                          </svg>
-                          <p className="text-lg font-medium">
-                            {file
-                              ? file.name
-                              : "Drop your file here, or click to select"}
-                          </p>
-                          {!file && (
-                            <p className="text-sm text-gray-500">
-                              Drag and drop your file, or click to browse
-                            </p>
-                          )}
-                        </div>
+                            Switch to Calibration
+                          </motion.button>
+                        )}
                       </div>
-
-                      {/* Upload Status */}
-                      {uploadFileMutation.isPending && (
-                        <div className="mt-4">
-                          <p className="text-sm text-secondary mb-2">{status}</p>
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div
-                              className="bg-green-500 h-2.5 rounded-full transition-all duration-500"
-                              style={{ width: `${progress}%` }}
-                            />
+                    ) : (
+                      <>
+                        {/* Dataset Selection */}
+                        {isLoadingDatasets ? (
+                          <div className="p-4 rounded-lg border text-center mb-4" style={{ backgroundColor: "var(--muted)", borderColor: "var(--border)" }}>
+                            Loading datasets...
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
+                        ) : datasetsData && datasetsData.length > 0 ? (
+                          <div className="mb-4">
+                            <Select
+                              label="Select Dataset *"
+                              value={selectedDatasetId}
+                              onChange={setSelectedDatasetId}
+                              disabled={isSubmitting || uploadJsonMutation.isPending}
+                              placeholder="Select a dataset to upload to"
+                              helperText="Choose which dataset to store your contribution data in"
+                              options={datasetsData.map((dataset) => ({
+                                value: dataset.dataSetId.toString(),
+                                label: `Dataset #${dataset.dataSetId} ${dataset.cdn ? "⚡" : ""}`,
+                              }))}
+                            />
+                            {!selectedDatasetId && (
+                              <p className="text-xs text-red-500 mt-1">Dataset selection is required</p>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-lg border text-center mb-4" style={{ backgroundColor: "var(--muted)", borderColor: "var(--border)" }}>
+                            <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
+                              No datasets found. Go to Storage page to create a dataset first.
+                            </p>
+                            <motion.a
+                              href="/manage-storage"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <button
+                                className="px-4 py-2 rounded-lg font-medium text-white text-sm transition-all"
+                                style={{
+                                  backgroundColor: "#FF6A00",
+                                }}
+                              >
+                                Go to Storage
+                              </button>
+                            </motion.a>
+                          </div>
+                        )}
+
+                        {/* Upload Status */}
+                        {(uploadJsonMutation.isPending || status) && (
+                          <div className="mt-4">
+                            <p className={`text-sm mb-2 ${
+                              status.includes("❌")
+                                ? "text-red-500"
+                                : status.includes("✅") || status.includes("🎉")
+                                ? "text-green-500"
+                                : "text-secondary"
+                            }`}>
+                              {status || "Preparing upload..."}
+                            </p>
+                            {uploadJsonMutation.isPending && (
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div
+                                  className="bg-green-500 h-2.5 rounded-full transition-all duration-500"
+                                  style={{ width: `${progress}%` }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 )}
 
                 {/* Submit Button */}
                 <motion.button
                   type="submit"
-                  disabled={isSubmitting || uploadFileMutation.isPending}
+                  disabled={isSubmitting || uploadJsonMutation.isPending || !selectedDatasetId || !isOnCalibration}
                   className="w-full btn-orange disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 py-3"
-                  whileHover={!isSubmitting && !uploadFileMutation.isPending ? { scale: 1.02 } : {}}
-                  whileTap={!isSubmitting && !uploadFileMutation.isPending ? { scale: 0.98 } : {}}
+                  whileHover={!isSubmitting && !uploadJsonMutation.isPending ? { scale: 1.02 } : {}}
+                  whileTap={!isSubmitting && !uploadJsonMutation.isPending ? { scale: 0.98 } : {}}
                 >
-                  {isSubmitting ? (
+                  {isSubmitting || uploadJsonMutation.isPending ? (
                     <>
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Submitting...
+                      {uploadJsonMutation.isPending ? "Uploading to Filecoin..." : "Submitting..."}
                     </>
                   ) : (
                     <>

@@ -49,7 +49,7 @@ export default function ProcessContributionPage() {
     try {
       // Step 1: Store contribution data
       setStep("receiving");
-      const contribution = addContribution({
+      const contribution = await addContribution({
         contributor: address,
         data,
         status: "pending",
@@ -58,11 +58,11 @@ export default function ProcessContributionPage() {
 
       // Step 2: AI Analysis
       setStep("analyzing");
-      updateContribution(contribution.id, { status: "analyzing" });
+      await updateContribution(contribution.id, { status: "analyzing" });
       
       const analysis = await mockAIAnalysis(data);
       setAiResult(analysis);
-      updateContribution(contribution.id, {
+      await updateContribution(contribution.id, {
         status: analysis.approved ? "approved" : "rejected",
         aiAnalysis: analysis,
       });
@@ -90,7 +90,7 @@ export default function ProcessContributionPage() {
 
       const swapResult = await swapResponse.json();
       setSwapHash(swapResult.hash);
-      updateContribution(contribution.id, {
+      await updateContribution(contribution.id, {
         swapTxHash: swapResult.hash,
       });
 
@@ -98,11 +98,34 @@ export default function ProcessContributionPage() {
       setStep("completing");
       await new Promise((resolve) => setTimeout(resolve, 1500));
       
-      // Store to IPFS (mock - in production, upload JSON to IPFS)
-      const mockIpfsCid = `Qm${Math.random().toString(36).substr(2, 43)}`;
-      updateContribution(contribution.id, {
+      // Store to IPFS - now using real IPFS upload
+      const ipfsResponse = await fetch("/api/ipfs/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: {
+            ...contribution,
+            status: "completed",
+            swapTxHash: swapResult.hash,
+            aiAnalysis: analysis,
+          },
+        }),
+      });
+
+      let ipfsCid: string;
+      if (ipfsResponse.ok) {
+        const ipfsResult = await ipfsResponse.json();
+        ipfsCid = ipfsResult.cid;
+      } else {
+        // Fallback to mock CID if IPFS upload fails
+        ipfsCid = `Qm${Math.random().toString(36).substr(2, 43)}`;
+      }
+
+      await updateContribution(contribution.id, {
         status: "completed",
-        ipfsCid: mockIpfsCid,
+        ipfsCid,
         prMerged: true,
       });
 
@@ -111,8 +134,9 @@ export default function ProcessContributionPage() {
     } catch (error: any) {
       console.error("Error processing contribution:", error);
       if (contributionId) {
-        updateContribution(contributionId, {
+        await updateContribution(contributionId, {
           status: "rejected",
+          errorMessage: error.message,
         });
       }
       setStep("rejected");

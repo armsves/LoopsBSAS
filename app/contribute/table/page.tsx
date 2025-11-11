@@ -1,21 +1,41 @@
 "use client";
 
-import { useContributions } from "@/hooks/useContributions";
+import { useDataSetsWrapped } from "@/hooks/useDataSetsWrapped";
+import { useAccount, useSwitchChain } from "wagmi";
+import { calibration } from '@filoz/synapse-core/chains';
 import { motion } from "framer-motion";
-import { CheckCircle, XCircle, Clock, ExternalLink, Copy, Send, FileText } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { DataSetWithPieces, PieceWithMetadata } from "@filoz/synapse-react";
+import { getPieceInfoFromCidBytes, getDatasetSizeMessageFromPieces } from "@/utils/storageCalculations";
+import { CopyableURL } from "@/components/ui/CopyableURL";
+import { ContributionPieceDetails } from "./ContributionPieceDetails";
 
 export default function ContributionsTablePage() {
-  const { contributions } = useContributions();
+  const { isConnected, chainId } = useAccount();
+  const { switchChain } = useSwitchChain();
   const router = useRouter();
+  const isOnCalibration = chainId === calibration.id;
+  const { data: datasetsData, isLoading: isLoadingDatasets } = useDataSetsWrapped();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedPieces, setExpandedPieces] = useState<Set<string>>(new Set());
+  const [pieceContents, setPieceContents] = useState<Record<string, { content: any; contentType: string | null; error: string | null }>>({});
 
-  const handleProcessContribution = (contrib: any) => {
+  const handleSwitchChain = async () => {
+    try {
+      if (switchChain) {
+        await switchChain({ chainId: calibration.id });
+      }
+    } catch (error) {
+      console.error("Error switching chain:", error);
+    }
+  };
+
+  const handleProcessContribution = (data: Record<string, any>) => {
     // Build URL params from contribution data
     const params = new URLSearchParams();
-    Object.entries(contrib.data).forEach(([key, value]) => {
+    Object.entries(data).forEach(([key, value]) => {
       if (value && typeof value === 'string') {
         params.append(key, value);
       }
@@ -23,44 +43,69 @@ export default function ContributionsTablePage() {
     router.push(`/contribute/process?${params.toString()}`);
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString();
+  const fetchPieceContent = async (piece: PieceWithMetadata, pieceKey: string) => {
+    if (expandedPieces.has(pieceKey)) {
+      setExpandedPieces(prev => {
+        const next = new Set(prev);
+        next.delete(pieceKey);
+        return next;
+      });
+      return;
+    }
+
+    setExpandedPieces(prev => new Set(prev).add(pieceKey));
+    
+    if (pieceContents[pieceKey]) {
+      return; // Already loaded
+    }
+
+    try {
+      const response = await fetch(piece.url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch content: ${response.statusText}`);
+      }
+
+      const contentTypeHeader = response.headers.get("content-type");
+      
+      if (contentTypeHeader?.includes("json") || contentTypeHeader?.includes("text")) {
+        const text = await response.text();
+        try {
+          const json = JSON.parse(text);
+          setPieceContents(prev => ({
+            ...prev,
+            [pieceKey]: { content: json, contentType: contentTypeHeader, error: null }
+          }));
+        } catch {
+          setPieceContents(prev => ({
+            ...prev,
+            [pieceKey]: { content: text, contentType: contentTypeHeader, error: null }
+          }));
+        }
+      } else {
+        setPieceContents(prev => ({
+          ...prev,
+          [pieceKey]: { content: null, contentType: contentTypeHeader, error: "Not a JSON/text file" }
+        }));
+      }
+    } catch (err) {
+      setPieceContents(prev => ({
+        ...prev,
+        [pieceKey]: { content: null, contentType: null, error: err instanceof Error ? err.message : "Failed to load content" }
+      }));
+    }
   };
 
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const isContributionJson = (content: any): boolean => {
+    return content && 
+           typeof content === 'object' && 
+           ('title' in content || 'websiteUrl' in content || 'category' in content) &&
+           ('contributor' in content || 'timestamp' in content);
   };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case "rejected":
-        return <XCircle className="w-5 h-5 text-red-500" />;
-      case "approved":
-        return <CheckCircle className="w-5 h-5 text-blue-500" />;
-      default:
-        return <Clock className="w-5 h-5 text-yellow-500" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "bg-green-500/10 text-green-500 border-green-500";
-      case "rejected":
-        return "bg-red-500/10 text-red-500 border-red-500";
-      case "approved":
-        return "bg-blue-500/10 text-blue-500 border-blue-500";
-      default:
-        return "bg-yellow-500/10 text-yellow-500 border-yellow-500";
-    }
   };
 
   return (
@@ -92,13 +137,55 @@ export default function ContributionsTablePage() {
           </Link>
         </div>
 
-        {contributions.length === 0 ? (
+        {/* Chain Validation */}
+        {!isConnected ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="card-dark p-12 text-center"
           >
-            <p className="text-secondary text-lg mb-4">No contributions yet</p>
+            <h2 className="text-2xl font-bold mb-4">Connect Your Wallet</h2>
+            <p className="text-base mb-6" style={{ color: "var(--secondary)" }}>
+              Please connect your wallet to view stored contributions.
+            </p>
+          </motion.div>
+        ) : !isOnCalibration ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-dark p-12 text-center"
+          >
+            <h2 className="text-2xl font-bold mb-4">Switch to Calibration Network</h2>
+            <p className="text-base mb-6" style={{ color: "var(--secondary)" }}>
+              Please switch to the Filecoin Calibration network to view stored files.
+            </p>
+            <motion.button
+              onClick={handleSwitchChain}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="px-6 py-3 rounded-lg font-medium text-white transition-all"
+              style={{
+                backgroundColor: "#FF6A00",
+              }}
+            >
+              Switch to Calibration
+            </motion.button>
+          </motion.div>
+        ) : isLoadingDatasets ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-dark p-12 text-center"
+          >
+            <p className="text-secondary text-lg">Loading datasets...</p>
+          </motion.div>
+        ) : !datasetsData || datasetsData.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="card-dark p-12 text-center"
+          >
+            <p className="text-secondary text-lg mb-4">No datasets found</p>
             <Link href="/contribute">
               <button
                 className="px-6 py-3 rounded-lg font-medium text-white transition-all"
@@ -106,15 +193,15 @@ export default function ContributionsTablePage() {
                   backgroundColor: "#FF6A00",
                 }}
               >
-                Make Your First Contribution
+                Create Your First Contribution
               </button>
             </Link>
           </motion.div>
         ) : (
           <div className="space-y-6">
-            {contributions.map((contrib, idx) => (
+            {datasetsData.map((dataset: DataSetWithPieces, idx: number) => (
               <motion.div
-                key={contrib.id}
+                key={dataset.dataSetId.toString()}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
@@ -124,172 +211,127 @@ export default function ContributionsTablePage() {
                   borderColor: "var(--border)",
                 }}
               >
-                <div className="flex sm:flex-row flex-col justify-between gap-4 mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4
-                        className="text-lg font-medium"
-                        style={{ color: "var(--foreground)" }}
-                      >
-                        Contribution #{contrib.id.slice(-8)}
-                      </h4>
-                      <div
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded border text-xs font-semibold ${getStatusColor(
-                          contrib.status
-                        )}`}
-                      >
-                        {getStatusIcon(contrib.status)}
-                        {contrib.status}
-                      </div>
-                    </div>
+                <div className="flex sm:flex-row flex-col justify-between mb-4">
+                  <div>
+                    <h4
+                      className="text-lg font-medium"
+                      style={{ color: "var(--foreground)" }}
+                    >
+                      Dataset #{dataset.dataSetId}
+                    </h4>
                     <p
                       className="text-sm mt-1"
                       style={{ color: "var(--muted-foreground)" }}
                     >
-                      <strong>Title:</strong> {contrib.data.title || "N/A"}
-                    </p>
-                    {contrib.data.category && (
-                      <p
-                        className="text-sm mt-1"
-                        style={{ color: "var(--muted-foreground)" }}
-                      >
-                        <strong>Category:</strong> {contrib.data.category}
-                      </p>
-                    )}
-                    {contrib.data.websiteUrl && (
-                      <p
-                        className="text-sm mt-1"
-                        style={{ color: "var(--muted-foreground)" }}
-                      >
-                        <strong>URL:</strong>{" "}
-                        <a
-                          href={contrib.data.websiteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline"
-                        >
-                          {contrib.data.websiteUrl}
-                          <ExternalLink className="w-3 h-3 inline ml-1" />
-                        </a>
-                      </p>
-                    )}
-                    <p
-                      className="text-sm mt-1"
-                      style={{ color: "var(--muted-foreground)" }}
-                    >
-                      <strong>Contributor:</strong>{" "}
-                      <span className="font-mono">{formatAddress(contrib.contributor)}</span>
-                    </p>
-                    <p
-                      className="text-sm mt-1"
-                      style={{ color: "var(--muted-foreground)" }}
-                    >
-                      <strong>Date:</strong> {formatDate(contrib.timestamp)}
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {contrib.aiAnalysis && (
-                      <div className="text-right">
-                        <p className="text-sm font-semibold">
-                          AI Score: {contrib.aiAnalysis.score}/100
-                        </p>
-                        <p className="text-xs text-secondary">
-                          {contrib.aiAnalysis.approved ? "✓ Approved" : "✗ Rejected"}
-                        </p>
-                      </div>
-                    )}
-                    {contrib.status === "pending" && (
-                      <motion.button
-                        onClick={() => handleProcessContribution(contrib)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-2 text-sm"
+                      Status:{" "}
+                      <span
+                        className="font-medium"
                         style={{
-                          backgroundColor: "#FF6A00",
+                          color: dataset.live
+                            ? "var(--success)"
+                            : "var(--destructive)",
                         }}
                       >
-                        <Send className="w-4 h-4" />
-                        Process Contribution
-                      </motion.button>
-                    )}
+                        {dataset.live ? "Live" : "Inactive"}
+                      </span>
+                    </p>
+                    <p
+                      className="text-sm mt-1"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      With CDN:{" "}
+                      <span
+                        className="font-medium"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {dataset.cdn ? "⚡ Yes ⚡" : "No"}
+                      </span>
+                    </p>
+                    <div
+                      className="text-sm mt-1"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      PDP URL: <CopyableURL url={dataset.pdp.serviceURL} />
+                    </div>
+                  </div>
+                  <div>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      {getDatasetSizeMessageFromPieces(dataset)}
+                    </p>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      Commission: {Number(dataset.commissionBps) / 100}%
+                    </p>
+                    <p
+                      className="text-sm"
+                      style={{ color: "var(--muted-foreground)" }}
+                    >
+                      Managed: {dataset.managed ? "Yes" : "No"}
+                    </p>
                   </div>
                 </div>
 
-                {/* File Information */}
-                {contrib.data.fileName && (
+                {/* Stored Files Section */}
+                <div className="mt-4">
                   <div
-                    className="mt-4 rounded-lg border p-4"
+                    className="rounded-lg border p-4"
                     style={{
                       backgroundColor: "var(--card)",
                       borderColor: "var(--border)",
                     }}
                   >
-                    <h6
-                      className="text-sm font-medium mb-2"
-                      style={{ color: "var(--foreground)" }}
-                    >
-                      Stored File
-                    </h6>
-                    <div className="space-y-1 text-sm">
-                      <p style={{ color: "var(--muted-foreground)" }}>
-                        <strong>File:</strong> {contrib.data.fileName}
-                      </p>
-                      {contrib.data.fileSize && (
-                        <p style={{ color: "var(--muted-foreground)" }}>
-                          <strong>Size:</strong>{" "}
-                          {(contrib.data.fileSize / 1024 / 1024).toFixed(4)} MB
-                        </p>
-                      )}
-                      {contrib.data.fileCid && (
-                        <div className="flex items-center gap-2">
-                          <p style={{ color: "var(--muted-foreground)" }}>
-                            <strong>CID:</strong>{" "}
-                            <span className="font-mono text-xs">
-                              {contrib.data.fileCid.slice(0, 20)}...
-                            </span>
-                          </p>
-                          <button
-                            onClick={() => copyToClipboard(contrib.data.fileCid!, contrib.id)}
-                            className="text-secondary hover:text-foreground transition-colors"
+                    {dataset.pieces && dataset.pieces.length > 0 ? (
+                      <div className="w-full">
+                        <div className="sm:flex flex-col sm:justify-between items-start mb-2 w-full">
+                          <h6
+                            className="text-sm font-medium"
+                            style={{ color: "var(--foreground)" }}
                           >
-                            <Copy className="w-3 h-3" />
-                          </button>
+                            {`Stored Files: #${dataset.pieces.length}`}
+                          </h6>
                         </div>
-                      )}
-                    </div>
+                        <div className="space-y-2">
+                          {dataset.pieces.reverse().map((piece) => {
+                            const pieceKey = `${dataset.dataSetId}-${piece.id}`;
+                            const pieceSizeMiB = getPieceInfoFromCidBytes(piece.cid).sizeMiB;
+                            const pieceContent = pieceContents[pieceKey];
+                            const isExpanded = expandedPieces.has(pieceKey);
+                            const isContribution = pieceContent && isContributionJson(pieceContent.content);
+                            
+                            return (
+                              <ContributionPieceDetails
+                                key={piece.id.toString()}
+                                dataset={dataset}
+                                piece={piece}
+                                pieceSizeMiB={pieceSizeMiB}
+                                pieceKey={pieceKey}
+                                isExpanded={isExpanded}
+                                pieceContent={pieceContent}
+                                isContribution={isContribution}
+                                onToggleContent={() => fetchPieceContent(piece, pieceKey)}
+                                onProcessContribution={() => {
+                                  if (pieceContent && isContribution) {
+                                    handleProcessContribution(pieceContent.content);
+                                  }
+                                }}
+                                onCopy={(text) => copyToClipboard(text, pieceKey)}
+                                copiedId={copiedId}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm" style={{ color: "var(--muted-foreground)" }}>
+                        No files stored in this dataset yet.
+                      </p>
+                    )}
                   </div>
-                )}
-
-                {/* Transaction & IPFS Info */}
-                <div className="mt-4 flex flex-wrap gap-4 text-sm">
-                  {contrib.swapTxHash && (
-                    <div>
-                      <strong>Swap TX:</strong>{" "}
-                      <a
-                        href={`https://sepolia.basescan.org/tx/${contrib.swapTxHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-500 hover:underline inline-flex items-center gap-1"
-                      >
-                        {contrib.swapTxHash.slice(0, 10)}...
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                  {contrib.ipfsCid && (
-                    <div className="flex items-center gap-2">
-                      <strong>IPFS CID:</strong>{" "}
-                      <span className="font-mono text-xs">
-                        {contrib.ipfsCid.slice(0, 12)}...
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(contrib.ipfsCid!, contrib.id)}
-                        className="text-secondary hover:text-foreground transition-colors"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             ))}
@@ -297,35 +339,31 @@ export default function ContributionsTablePage() {
         )}
 
         {/* Summary Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4"
-        >
-          <div className="card-dark p-4">
-            <div className="text-2xl font-bold">{contributions.length}</div>
-            <div className="text-sm text-secondary">Total Contributions</div>
-          </div>
-          <div className="card-dark p-4">
-            <div className="text-2xl font-bold text-green-500">
-              {contributions.filter((c) => c.status === "completed").length}
+        {isConnected && isOnCalibration && datasetsData && datasetsData.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4"
+          >
+            <div className="card-dark p-4">
+              <div className="text-2xl font-bold">{datasetsData.length}</div>
+              <div className="text-sm text-secondary">Total Datasets</div>
             </div>
-            <div className="text-sm text-secondary">Completed</div>
-          </div>
-          <div className="card-dark p-4">
-            <div className="text-2xl font-bold text-yellow-500">
-              {contributions.filter((c) => c.status === "pending" || c.status === "analyzing").length}
+            <div className="card-dark p-4">
+              <div className="text-2xl font-bold text-green-500">
+                {datasetsData.reduce((acc, d) => acc + (d.pieces?.length || 0), 0)}
+              </div>
+              <div className="text-sm text-secondary">Total Files</div>
             </div>
-            <div className="text-sm text-secondary">Pending</div>
-          </div>
-          <div className="card-dark p-4">
-            <div className="text-2xl font-bold text-red-500">
-              {contributions.filter((c) => c.status === "rejected").length}
+            <div className="card-dark p-4">
+              <div className="text-2xl font-bold text-blue-500">
+                {datasetsData.filter((d) => d.live).length}
+              </div>
+              <div className="text-sm text-secondary">Live Datasets</div>
             </div>
-            <div className="text-sm text-secondary">Rejected</div>
-          </div>
-        </motion.div>
+          </motion.div>
+        )}
       </motion.main>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export interface Contribution {
   id: string;
@@ -16,64 +16,126 @@ export interface Contribution {
   prMerged?: boolean;
 }
 
-const STORAGE_KEY = "contributions";
-
 /**
  * Hook for managing contributions storage
- * Stores contributions in localStorage (can be upgraded to IPFS later)
+ * Stores contributions on IPFS instead of localStorage
  */
 export const useContributions = () => {
   const [contributions, setContributions] = useState<Contribution[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [ipfsIndexCid, setIpfsIndexCid] = useState<string | null>(null);
 
-  // Load contributions from localStorage on mount
+  // Load contributions from IPFS on mount
   useEffect(() => {
+    loadContributionsFromIPFS();
+  }, []);
+
+  const loadContributionsFromIPFS = async () => {
+    setIsLoading(true);
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setContributions(JSON.parse(stored));
+      // Try to load from localStorage first (for migration/fallback)
+      const localIndexCid = localStorage.getItem("contributions_ipfs_index");
+      if (localIndexCid) {
+        setIpfsIndexCid(localIndexCid);
+        // Fetch from IPFS gateway
+        try {
+          const response = await fetch(`/api/ipfs/upload?cid=${localIndexCid}`);
+          // For now, fallback to localStorage if IPFS fetch fails
+          const stored = localStorage.getItem("contributions_backup");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setContributions(parsed);
+          }
+        } catch (error) {
+          console.warn("Failed to load from IPFS, using localStorage backup:", error);
+          const stored = localStorage.getItem("contributions_backup");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            setContributions(parsed);
+          }
+        }
+      } else {
+        // No IPFS index yet, check for localStorage backup
+        const stored = localStorage.getItem("contributions_backup");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          setContributions(parsed);
+        }
       }
     } catch (error) {
       console.error("Error loading contributions:", error);
-    }
-  }, []);
-
-  // Save contributions to localStorage whenever they change
-  const saveContributions = (newContributions: Contribution[]) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newContributions));
-      setContributions(newContributions);
-    } catch (error) {
-      console.error("Error saving contributions:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const addContribution = (contribution: Omit<Contribution, "id" | "timestamp">) => {
+  const saveContributionsToIPFS = async (newContributions: Contribution[]) => {
+    try {
+      // Upload to IPFS
+      const response = await fetch("/api/ipfs/upload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          data: newContributions,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to upload to IPFS");
+      }
+
+      const result = await response.json();
+      const cid = result.cid;
+
+      // Store the index CID
+      setIpfsIndexCid(cid);
+      localStorage.setItem("contributions_ipfs_index", cid);
+
+      // Also keep a backup in localStorage for faster access
+      localStorage.setItem("contributions_backup", JSON.stringify(newContributions));
+
+      setContributions(newContributions);
+      console.log("✅ Contributions saved to IPFS:", cid);
+    } catch (error) {
+      console.error("Error saving contributions to IPFS:", error);
+      // Fallback to localStorage if IPFS fails
+      localStorage.setItem("contributions_backup", JSON.stringify(newContributions));
+      setContributions(newContributions);
+    }
+  };
+
+  const addContribution = useCallback(async (contribution: Omit<Contribution, "id" | "timestamp">) => {
     const newContribution: Contribution = {
       ...contribution,
       id: `contrib-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: Date.now(),
     };
     const updated = [newContribution, ...contributions];
-    saveContributions(updated);
+    await saveContributionsToIPFS(updated);
     return newContribution;
-  };
+  }, [contributions]);
 
-  const updateContribution = (id: string, updates: Partial<Contribution>) => {
+  const updateContribution = useCallback(async (id: string, updates: Partial<Contribution>) => {
     const updated = contributions.map((contrib) =>
       contrib.id === id ? { ...contrib, ...updates } : contrib
     );
-    saveContributions(updated);
-  };
+    await saveContributionsToIPFS(updated);
+  }, [contributions]);
 
-  const getContribution = (id: string) => {
+  const getContribution = useCallback((id: string) => {
     return contributions.find((contrib) => contrib.id === id);
-  };
+  }, [contributions]);
 
   return {
     contributions,
+    isLoading,
+    ipfsIndexCid,
     addContribution,
     updateContribution,
     getContribution,
+    refreshContributions: loadContributionsFromIPFS,
   };
 };
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { calibration } from '@filoz/synapse-core/chains';
+import { baseSepolia } from 'wagmi/chains';
 
 // Contract ABI for OnlySwap - matching the frontend
 const MY_CONTRACT_ABI = [
@@ -37,10 +37,16 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Ensure RPC URL is HTTP (not WebSocket)
-        const httpRpcUrl = rpcUrl.startsWith('wss://') || rpcUrl.startsWith('ws://')
+        // Ensure RPC URL is HTTP (not WebSocket) and use a reliable RPC
+        let httpRpcUrl = rpcUrl.startsWith('wss://') || rpcUrl.startsWith('ws://')
             ? rpcUrl.replace('wss://', 'https://').replace('ws://', 'http://')
             : rpcUrl;
+
+        // Use a more reliable RPC if the default one times out
+        // Fallback to public RPC if custom one fails
+        if (httpRpcUrl.includes('drpc.org')) {
+            httpRpcUrl = 'https://sepolia.base.org';
+        }
 
         console.log('🔗 Executing swap from backend...');
         console.log('📡 RPC URL:', httpRpcUrl);
@@ -51,17 +57,21 @@ export async function POST(request: NextRequest) {
 
         console.log('📝 Wallet address:', account.address);
 
-        // Create wallet client with HTTP transport (like frontend)
+        // Create wallet client with HTTP transport and timeout
         const walletClient = createWalletClient({
             account,
-            chain: calibration,
-            transport: http(httpRpcUrl),
+            chain: baseSepolia,
+            transport: http(httpRpcUrl, {
+                timeout: 30000, // 30 second timeout
+            }),
         });
 
-        // Create public client for reading
+        // Create public client for reading with timeout
         const publicClient = createPublicClient({
-            chain: calibration,
-            transport: http(httpRpcUrl),
+            chain: baseSepolia,
+            transport: http(httpRpcUrl, {
+                timeout: 30000, // 30 second timeout
+            }),
         });
 
         console.log('⏳ Executing swap transaction...');
