@@ -61,6 +61,27 @@ export default function Home() {
     },
   ];
 
+  const rpcFeatures = [
+    {
+      title: "GitHub Integration",
+      description: "Fork and create pull requests directly from the platform",
+      link: "/fork-pr",
+      cta: "Fork & Create PR"
+    },
+    {
+      title: "RPC Endpoint Management",
+      description: "Add and manage RPC endpoints for blockchain networks",
+      link: "/add-rpc",
+      cta: "Add RPC Endpoint"
+    },
+    {
+      title: "Browse RPCs",
+      description: "Explore RPC endpoints from all supported networks",
+      link: "/rpc",
+      cta: "Browse RPCs"
+    },
+  ];
+
   return (
     <div className="w-full flex flex-col min-h-screen" style={{ backgroundColor: "var(--background)" }}>
       {showConfetti && (
@@ -310,6 +331,60 @@ export default function Home() {
                 </motion.div>
               ))}
             </div>
+          </div>
+        </motion.div>
+
+        {/* RPC Management Section */}
+        <motion.div
+          variants={itemVariants}
+          className="max-w-6xl w-full mt-16"
+        >
+          <h2 className="text-3xl font-bold text-center mb-4" style={{ color: "var(--foreground)" }}>
+            RPC Infrastructure Management
+          </h2>
+          <p className="text-lg text-center mb-8 max-w-3xl mx-auto" style={{ color: "var(--secondary)" }}>
+            Contribute RPC endpoints to the Chain-Love repository. Fork, manage, and help build the blockchain infrastructure ecosystem.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {rpcFeatures.map((feature, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9 + idx * 0.1 }}
+                className="rounded-xl p-6 border"
+                style={{
+                  backgroundColor: "var(--card)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <h3 className="text-xl font-bold mb-3" style={{ color: "var(--foreground)" }}>
+                  {feature.title}
+                </h3>
+                <p className="text-sm mb-4" style={{ color: "var(--secondary)", lineHeight: "1.6" }}>
+                  {feature.description}
+                </p>
+                <motion.button
+                  onClick={() => router.push(feature.link)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="w-full px-4 py-2 rounded-lg font-semibold text-sm transition-all border-2"
+                  style={{
+                    borderColor: "#FF6A00",
+                    color: "#FF6A00",
+                    backgroundColor: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#FF6A0010";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  {feature.cta}
+                </motion.button>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
       </motion.main>

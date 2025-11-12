@@ -5,7 +5,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ThemeToggle } from "./ThemeToggle";
 import { SettingsModal } from "./SettingsModal";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowLeftRight, PlusCircle, Settings as SettingsIcon } from "lucide-react";
+import { Sparkles, ArrowLeftRight, PlusCircle, Settings as SettingsIcon, GitFork, Server, Network } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -100,59 +100,166 @@ export function Navbar() {
         />
       </motion.nav>
       
-      {/* Bottom Navigation Links - Hidden */}
-      {/* <motion.div
+      {/* Bottom Navigation Links */}
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="flex items-center justify-center gap-2 px-6 py-3 border-b"
+        className="flex items-center justify-center gap-2 px-6 py-3 border-b flex-wrap"
         style={{
           borderColor: "var(--border)",
           backgroundColor: "var(--background)"
         }}
       >
+        {/* Tool Contribution Section */}
+        <Link href="/contribute">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
+              pathname === "/contribute" || pathname === "/contribute/process" || pathname === "/contribute/table"
+                ? "shadow-lg"
+                : ""
+            }`}
+            style={{
+              backgroundColor: pathname === "/contribute" || pathname === "/contribute/process" || pathname === "/contribute/table" ? "#FF6A00" : "transparent",
+              color: pathname === "/contribute" || pathname === "/contribute/process" || pathname === "/contribute/table" ? "white" : "var(--foreground)",
+            }}
+            onMouseEnter={(e) => {
+              if (!pathname.startsWith("/contribute")) {
+                e.currentTarget.style.backgroundColor = "var(--muted)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!pathname.startsWith("/contribute")) {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
+          >
+            <PlusCircle className="w-4 h-4" />
+            Contribute Tools
+          </motion.div>
+        </Link>
+        
         <Link href="/manage-storage">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className={`px-4 py-2 rounded-lg transition-all text-sm cursor-pointer inline-block font-semibold ${
               pathname === "/manage-storage"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "hover:bg-muted text-foreground"
+                ? "shadow-lg"
+                : ""
             }`}
+            style={{
+              backgroundColor: pathname === "/manage-storage" ? "#FF6A00" : "transparent",
+              color: pathname === "/manage-storage" ? "white" : "var(--foreground)",
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== "/manage-storage") {
+                e.currentTarget.style.backgroundColor = "var(--muted)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/manage-storage") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
           >
             Storage
           </motion.div>
         </Link>
-        <Link href="/swap">
+        
+        {/* Divider */}
+        <div className="h-6 w-px mx-2" style={{ backgroundColor: "var(--border)" }} />
+        
+        {/* RPC Management Section */}
+        <Link href="/fork-pr">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
-              pathname === "/swap"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "hover:bg-muted text-foreground"
+              pathname === "/fork-pr"
+                ? "shadow-lg"
+                : ""
             }`}
+            style={{
+              backgroundColor: pathname === "/fork-pr" ? "#FF6A00" : "transparent",
+              color: pathname === "/fork-pr" ? "white" : "var(--foreground)",
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== "/fork-pr") {
+                e.currentTarget.style.backgroundColor = "var(--muted)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/fork-pr") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
           >
-            <ArrowLeftRight className="w-4 h-4" />
-            OnlySwap
+            <GitFork className="w-4 h-4" />
+            Fork & PR
           </motion.div>
         </Link>
-        <Link href="/contribute">
+        
+        <Link href="/add-rpc">
           <motion.div
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
-              pathname === "/contribute"
-                ? "bg-primary text-primary-foreground shadow-lg"
-                : "hover:bg-muted text-foreground"
+              pathname === "/add-rpc"
+                ? "shadow-lg"
+                : ""
             }`}
+            style={{
+              backgroundColor: pathname === "/add-rpc" ? "#FF6A00" : "transparent",
+              color: pathname === "/add-rpc" ? "white" : "var(--foreground)",
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== "/add-rpc") {
+                e.currentTarget.style.backgroundColor = "var(--muted)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/add-rpc") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
           >
-            <PlusCircle className="w-4 h-4" />
-            Contribute
+            <Server className="w-4 h-4" />
+            Add RPC
           </motion.div>
         </Link>
-      </motion.div> */}
+        
+        <Link href="/rpc">
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={`px-4 py-2 rounded-lg transition-all text-sm flex items-center gap-1 cursor-pointer font-semibold ${
+              pathname === "/rpc"
+                ? "shadow-lg"
+                : ""
+            }`}
+            style={{
+              backgroundColor: pathname === "/rpc" ? "#FF6A00" : "transparent",
+              color: pathname === "/rpc" ? "white" : "var(--foreground)",
+            }}
+            onMouseEnter={(e) => {
+              if (pathname !== "/rpc") {
+                e.currentTarget.style.backgroundColor = "var(--muted)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (pathname !== "/rpc") {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
+          >
+            <Network className="w-4 h-4" />
+            Browse RPCs
+          </motion.div>
+        </Link>
+      </motion.div>
     </>
   );
 }

@@ -17,6 +17,7 @@ import { ConfigProvider } from "@/providers/ConfigProvider";
 import { GeolocationProvider } from "@/providers/GeolocationProvider";
 import { config } from "@/services/wagmi";
 import { calibration } from '@filoz/synapse-core/chains';
+import { Toaster } from "@/components/ui/shadcn/sonner";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,7 @@ export default function RootLayout({
                         <Navbar />
                         {children}
                       </main>
+                      <Toaster />
                     </RainbowKitProvider>
                   </WagmiProvider>
                 </QueryClientProvider>
