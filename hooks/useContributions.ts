@@ -14,6 +14,7 @@ export interface Contribution {
   swapTxHash?: string;
   ipfsCid?: string;
   prMerged?: boolean;
+  errorMessage?: string;
 }
 
 /**

@@ -205,13 +205,7 @@ export default function ContributePage() {
       setIsSuccess(true);
       triggerConfetti();
 
-      // Reset form after success
-      setTimeout(() => {
-        setFormData({ title: "", websiteUrl: "", category: "", paymentNetwork: "base" });
-        setSelectedDatasetId("");
-        setIsSuccess(false);
-        handleReset();
-      }, 3000);
+      // Don't auto-close - let user close manually
     } catch (error) {
       console.error("Error submitting contribution:", error);
       setIsSubmitting(false);
@@ -310,17 +304,37 @@ export default function ContributePage() {
                 <p className="text-secondary text-center mb-4">
                   Your contribution has been created and is waiting for AI processing.
                 </p>
-                <motion.button
-                  onClick={() => router.push("/contribute/table")}
-                  className="px-6 py-2 rounded-lg font-medium text-white transition-all"
-                  style={{
-                    backgroundColor: "#FF6A00",
-                  }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  View Contributions Table
-                </motion.button>
+                <div className="flex gap-3">
+                  <motion.button
+                    onClick={() => {
+                      setFormData({ title: "", websiteUrl: "", category: "", paymentNetwork: "base" });
+                      setSelectedDatasetId("");
+                      setIsSuccess(false);
+                      handleReset();
+                    }}
+                    className="px-6 py-2 rounded-lg font-medium transition-all border-2"
+                    style={{
+                      borderColor: "#FF6A00",
+                      color: "#FF6A00",
+                      backgroundColor: "transparent",
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    Close
+                  </motion.button>
+                  <motion.button
+                    onClick={() => router.push("/contribute/table")}
+                    className="px-6 py-2 rounded-lg font-medium text-white transition-all"
+                    style={{
+                      backgroundColor: "#FF6A00",
+                    }}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    View Contributions Table
+                  </motion.button>
+                </div>
               </motion.div>
             ) : (
               <motion.form
@@ -455,19 +469,17 @@ export default function ContributePage() {
                         <p className="text-sm mb-3" style={{ color: "var(--muted-foreground)" }}>
                           Please switch to Filecoin Calibration network to store your contribution.
                         </p>
-                        {switchChain && (
-                          <motion.button
-                            onClick={handleSwitchChain}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="px-4 py-2 rounded-lg font-medium text-white text-sm transition-all"
-                            style={{
-                              backgroundColor: "#FF6A00",
-                            }}
-                          >
-                            Switch to Calibration
-                          </motion.button>
-                        )}
+                        <motion.button
+                          onClick={handleSwitchChain}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-4 py-2 rounded-lg font-medium text-white text-sm transition-all"
+                          style={{
+                            backgroundColor: "#FF6A00",
+                          }}
+                        >
+                          Switch to Calibration
+                        </motion.button>
                       </div>
                     ) : (
                       <>

@@ -5,7 +5,7 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ThemeToggle } from "./ThemeToggle";
 import { SettingsModal } from "./SettingsModal";
 import { motion } from "framer-motion";
-import { Heart, ArrowLeftRight, PlusCircle, Settings as SettingsIcon } from "lucide-react";
+import { Sparkles, ArrowLeftRight, PlusCircle, Settings as SettingsIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -36,9 +36,9 @@ export function Navbar() {
               whileHover={{ scale: 1.05 }}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <Heart className="w-5 h-5" style={{ color: "#22c55e", fill: "#22c55e" }} />
+              <Sparkles className="w-5 h-5" style={{ color: "#FF6A00" }} />
               <h1 className="text-lg font-bold">
-                CHAIN.LOVE
+                ContribHub
               </h1>
             </motion.div>
           </Link>

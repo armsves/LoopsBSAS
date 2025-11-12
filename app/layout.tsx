@@ -47,10 +47,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <title>CHAIN.LOVE - The open source DB for Web3 services</title>
+        <title>ContribHub - Contribute Web3 Tools with AI Validation & Cross-Chain Rewards</title>
         <meta
           name="description"
-          content="A community-driven database of Web3 services - including RPCs, wallets, explorers, bridges, oracles, dev tools and more."
+          content="User-friendly platform to contribute Web3 tools to an open-source repository. Contributions stored on IPFS, analyzed by AI, and rewarded with cross-chain payments on your preferred network."
         />
         <meta
           name="keywords"
