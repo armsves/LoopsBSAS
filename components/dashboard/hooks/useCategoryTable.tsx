@@ -19,7 +19,7 @@ import {
   CategoryKey,
 } from '@/service/infrastructureProvidersApi/types';
 import { useProviderSelectionStore } from '@/stores/toolbox/providerSelection';
-import { useShallow } from 'zustand/react/shallow';
+import { useShallow } from 'zustand/shallow';
 
 import { groupByProvider } from '../group-by-provider';
 import ArrayCellPopover from '../fields/shared/array-cell-popover';

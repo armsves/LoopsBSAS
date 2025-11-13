@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { useProviderSelectionStore } from '@/stores/toolbox/providerSelection';
 import { CategoryKey } from '@/service/infrastructureProvidersApi/types';
 import { CATEGORIES } from '@/components/dashboard/categories';
-import { useShallow } from 'zustand/react/shallow';
+import { useShallow } from 'zustand/shallow';
 import { useSearchParams } from 'next/navigation';
 
 type MinimalRow = { slug: string; provider: string };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/shadcn/card';
 import { Button } from '@/components/ui/shadcn/button';
 import { Input } from '@/components/ui/shadcn/input';
@@ -64,6 +64,7 @@ export default function AddRpcPage() {
   const [forkExists, setForkExists] = useState(false);
   const [networks, setNetworks] = useState<Array<{ key: string; name: string; folder?: string }>>([]);
   const [isLoadingNetworks, setIsLoadingNetworks] = useState(true);
+  const isSubmittingRef = useRef(false); // Ref to prevent duplicate submissions
 
   const getNetworkFolder = (networkKey: string): string => {
     const network = networks.find(n => n.key === networkKey);
@@ -181,6 +182,20 @@ export default function AddRpcPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent duplicate submissions
+    if (isSubmittingRef.current || isSubmitting) {
+      toast.error('Please wait, submission in progress...');
+      return;
+    }
+
+    // Prevent if PR already created
+    if (prUrl) {
+      toast.error('PR already created. Please refresh the page to create a new one.');
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -201,12 +216,18 @@ export default function AddRpcPage() {
         setPrUrl(data.prUrl);
         toast.success('Pull request created successfully!');
       } else {
-        toast.error(data.error || 'Failed to create PR');
+        // Handle duplicate PR error specifically
+        if (data.error?.includes('already exists') || response.status === 409) {
+          toast.error('A PR with this branch already exists. Please use different data or wait a moment.');
+        } else {
+          toast.error(data.error || 'Failed to create PR');
+        }
       }
     } catch (error: any) {
       toast.error('Failed to create PR: ' + (error.message || 'Network error'));
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -665,7 +686,7 @@ export default function AddRpcPage() {
               </Button>
               <Button
                 type='submit'
-                disabled={isSubmitting || !formData.slug || !formData.provider || !formData.plan || !formData.nodeType || !formData.chain}
+                disabled={isSubmitting || !!prUrl || !formData.slug || !formData.provider || !formData.plan || !formData.nodeType || !formData.chain}
                 className='flex-1'
               >
                 {isSubmitting ? (

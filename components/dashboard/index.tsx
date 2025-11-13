@@ -22,7 +22,7 @@ import { useQueryConfig } from '@/service/configApi';
 import FloatingBar from '@/components/dashboard/floating-bar';
 import MobileCards from '@/components/dashboard/mobile-cards';
 import { CategoryKey } from '@/service/infrastructureProvidersApi/types';
-import { useShallow } from 'zustand/react/shallow';
+import { useShallow } from 'zustand/shallow';
 import { useProviderSelectionStore } from '@/stores/toolbox/providerSelection';
 
 export default function Dashboard() {

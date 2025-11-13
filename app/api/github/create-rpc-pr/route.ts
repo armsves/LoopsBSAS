@@ -237,8 +237,10 @@ export async function POST(req: NextRequest) {
     );
     const defaultBranch = repoInfo.default_branch || 'main';
 
-    // Create a new branch
-    const branchName = `add-rpc-${rpcData.slug}-${Date.now()}`;
+    // Create a new branch with timestamp and random suffix to ensure uniqueness
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const branchName = `add-rpc-${rpcData.slug}-${timestamp}-${randomSuffix}`;
     const refName = `refs/heads/${branchName}`;
 
     // Get the latest commit SHA from default branch
@@ -248,14 +250,43 @@ export async function POST(req: NextRequest) {
     );
     const baseSha = refResponse.object.sha;
 
+    // Check if branch already exists (shouldn't happen, but safety check)
+    try {
+      await githubApiRequest(
+        `/repos/${forkFullName}/git/ref/heads/${branchName}`,
+        token
+      );
+      // Branch exists, return error
+      return NextResponse.json(
+        { error: 'Branch already exists. Please try again.' },
+        { status: 409 }
+      );
+    } catch (error: any) {
+      // Branch doesn't exist, which is what we want (404 is expected)
+      if (error.status !== 404) {
+        throw error;
+      }
+    }
+
     // Create new branch
-    await githubApiRequest(`/repos/${forkFullName}/git/refs`, token, {
-      method: 'POST',
-      body: JSON.stringify({
-        ref: refName,
-        sha: baseSha,
-      }),
-    });
+    try {
+      await githubApiRequest(`/repos/${forkFullName}/git/refs`, token, {
+        method: 'POST',
+        body: JSON.stringify({
+          ref: refName,
+          sha: baseSha,
+        }),
+      });
+    } catch (error: any) {
+      // Handle case where branch creation fails (e.g., already exists)
+      if (error.status === 422 || error.message?.includes('already exists')) {
+        return NextResponse.json(
+          { error: 'Branch already exists. Please try again.' },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     // Get network display name from config for PR title/description
     let networkDisplayName = networkFolder;
@@ -328,6 +359,27 @@ export async function POST(req: NextRequest) {
         }),
       }
     );
+
+    // Check if PR with this branch already exists before creating
+    try {
+      const existingPRs = await githubApiRequest(
+        `/repos/${REPO_OWNER}/${REPO_NAME}/pulls?head=${username}:${branchName}&state=open`,
+        token
+      );
+      if (Array.isArray(existingPRs) && existingPRs.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'A pull request with this branch already exists',
+            prUrl: existingPRs[0].html_url,
+            prNumber: existingPRs[0].number,
+          },
+          { status: 409 }
+        );
+      }
+    } catch (error: any) {
+      // If check fails, continue anyway (might be permission issue)
+      console.warn('Failed to check for existing PRs:', error.message);
+    }
 
     // Create PR
     const prResponse = await githubApiRequest(
